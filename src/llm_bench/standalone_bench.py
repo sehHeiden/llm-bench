@@ -6,6 +6,7 @@ Usage: uv run standalone-bench --prompts FILE [--expert-gb N] [--engine PATH] [-
 Defaults: prompts=prompts/math.txt  expert-gb=5
           engine=~/src/colibri/c/qwen36.real  snap=~/models/qwen36-35b-a3b-colibri-i4
 """
+
 import argparse
 import os
 import re
@@ -35,12 +36,16 @@ def main() -> None:
         env = {
             **os.environ,
             "LD_PRELOAD": "/usr/lib/x86_64-linux-gnu/libcuda.so.1",
-            "SNAP": args.snap, "COLI_CUDA": "1", "COLI_GPUS": "0",
-            "CUDA_EXPERT_GB": args.expert_gb, "N_NEW": args.n_new,
+            "SNAP": args.snap,
+            "COLI_CUDA": "1",
+            "COLI_GPUS": "0",
+            "CUDA_EXPERT_GB": args.expert_gb,
+            "N_NEW": args.n_new,
             "HEAT_FILE": str(heat),
         }
-        r = subprocess.run([args.engine, "256", "4", str(pf)],
-                           capture_output=True, text=True, env=env)
+        r = subprocess.run(
+            [args.engine, "256", "4", str(pf)], capture_output=True, text=True, env=env
+        )
         pf.unlink()
         err = r.stderr
         speed = re.search(r"^Speed:\s*([\d.]+)", err, re.M)

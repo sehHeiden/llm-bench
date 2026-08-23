@@ -5,6 +5,7 @@ Usage: uv run serve-bench --url URL --model MODEL --prompts FILE [--max-tokens N
 Defaults: url=http://127.0.0.1:8888/v1/chat/completions  model=glm-5.2-colibri
           prompts=prompts/math.txt  max-tokens=100
 """
+
 import argparse
 import json
 import sys
@@ -24,16 +25,21 @@ def main() -> None:
     prompts = Path(args.prompts).read_text().strip().splitlines()
     print("req tok/s tokens wall_s")
     for i, p in enumerate(prompts):
-        body = json.dumps({
-            "model": args.model,
-            "messages": [{"role": "user", "content": p}],
-            "max_tokens": args.max_tokens,
-            "stream": False,
-        }).encode()
+        body = json.dumps(
+            {
+                "model": args.model,
+                "messages": [{"role": "user", "content": p}],
+                "max_tokens": args.max_tokens,
+                "stream": False,
+            }
+        ).encode()
         t0 = time.time()
-        r = urllib.request.urlopen(urllib.request.Request(
-            args.url, data=body, headers={"Content-Type": "application/json"}),
-            timeout=180)
+        r = urllib.request.urlopen(
+            urllib.request.Request(
+                args.url, data=body, headers={"Content-Type": "application/json"}
+            ),
+            timeout=180,
+        )
         raw = r.read()
         try:
             d = json.loads(raw)
