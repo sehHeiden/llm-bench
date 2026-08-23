@@ -9,6 +9,12 @@ authors = [
 requires-python = ">=3.13"
 dependencies = []
 
+[dependency-groups]
+dev = [
+    "ruff",
+    "ty>=0.0.1a19",
+]
+
 [project.scripts]
 serve-bench = "llm_bench.serve_bench:main"
 standalone-bench = "llm_bench.standalone_bench:main"
@@ -18,10 +24,27 @@ requires = ["uv_build>=0.11.6,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.ruff]
-line-length = 100
+exclude = [".eggs", ".git", ".venv", ".ipynb_checkpoints"]
+include = ["*.py", "*.ipynb"]
+line-length = 120
+indent-width = 4
 target-version = "py313"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["S101", "S108", "S310", "S403", "S404", "S603", "S607"]
+select = ["ALL"]
+ignore = ["D203", "D212", "ISC001", "COM812", "E501", "T201", "CPY001"]
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"src/llm_bench/*.py" = [
+    "S101",    # assert statements
+    "S108",    # /tmp usage (heat file)
+    "S310",    # urllib http calls
+    "S403",    # subprocess
+    "S404",    # subprocess module
+    "S603",    # subprocess.run
+    "S607",    # subprocess with partial path
+    "PLC0415", # imports inside functions
+]
 

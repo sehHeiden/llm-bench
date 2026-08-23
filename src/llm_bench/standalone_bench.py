@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
-"""Run colibri qwen36 standalone (fresh process per prompt), heat accumulates via HEAT_FILE.
-Parses tok/s, TTFT, VRAM-hit, CPU-miss, RAM-hit from stderr per run.
+"""
+Run colibri qwen36 standalone (fresh process per prompt).
+
+Heat accumulates via HEAT_FILE. Parses tok/s, TTFT, VRAM-hit, CPU-miss, RAM-hit from stderr per run.
 
 Usage: uv run standalone-bench --prompts FILE [--expert-gb N] [--engine PATH] [--snap PATH]
 Defaults: prompts=prompts/math.txt  expert-gb=5
@@ -16,6 +17,7 @@ from pathlib import Path
 
 
 def main() -> None:
+    """Run the colibri standalone benchmark (fresh process per prompt)."""
     ap = argparse.ArgumentParser(description="colibri standalone benchmark")
     ap.add_argument("--prompts", default="prompts/math.txt")
     ap.add_argument("--expert-gb", default="5")
@@ -43,12 +45,10 @@ def main() -> None:
             "N_NEW": args.n_new,
             "HEAT_FILE": str(heat),
         }
-        r = subprocess.run(
-            [args.engine, "256", "4", str(pf)], capture_output=True, text=True, env=env
-        )
+        r = subprocess.run([args.engine, "256", "4", str(pf)], capture_output=True, text=True, env=env, check=False)
         pf.unlink()
         err = r.stderr
-        speed = re.search(r"^Speed:\s*([\d.]+)", err, re.M)
+        speed = re.search(r"^Speed:\s*([\d.]+)", err, re.MULTILINE)
         ttft = re.search(r"TTFT:\s*([\d.]+)", err)
         vhit = re.search(r"VRAM hit rate:\s*([\d.]+)", err)
         rhit = re.search(r"Expert cache hit rate:\s*([\d.]+)", err)

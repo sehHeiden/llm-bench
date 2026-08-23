@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-"""Benchmark a persistent OpenAI-compatible serve endpoint (colibri or llama.cpp).
+"""
+Benchmark a persistent OpenAI-compatible serve endpoint (colibri or llama.cpp).
 
 Usage: uv run serve-bench --url URL --model MODEL --prompts FILE [--max-tokens N]
 Defaults: url=http://127.0.0.1:8888/v1/chat/completions  model=glm-5.2-colibri
@@ -15,6 +15,7 @@ from pathlib import Path
 
 
 def main() -> None:
+    """Run the serve benchmark against a persistent OpenAI-compatible endpoint."""
     ap = argparse.ArgumentParser(description="Persistent serve benchmark")
     ap.add_argument("--url", default="http://127.0.0.1:8888/v1/chat/completions")
     ap.add_argument("--model", default="glm-5.2-colibri")
@@ -35,9 +36,7 @@ def main() -> None:
         ).encode()
         t0 = time.time()
         r = urllib.request.urlopen(
-            urllib.request.Request(
-                args.url, data=body, headers={"Content-Type": "application/json"}
-            ),
+            urllib.request.Request(args.url, data=body, headers={"Content-Type": "application/json"}),
             timeout=180,
         )
         raw = r.read()
