@@ -1,0 +1,10 @@
+Solve: 3x + 7 = 22. Find x.
+What is 17 * 23? Show the steps.
+If a train travels 60 km/h for 2.5 hours, how far does it go?
+Solve the quadratic equation x^2 - 5x + 6 = 0.
+Compute the derivative of f(x) = 3x^3 - 2x + 5.
+What is the integral of 2x dx from 0 to 4?
+A rectangle has area 24 and width 4. Find the perimeter.
+Solve: 2(x - 3) = 8. Find x.
+What is 15% of 480?
+Factor the polynomial x^2 + 7x + 12.
