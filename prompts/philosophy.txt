@@ -8,3 +8,23 @@ Describe Nietzsche's concept of the Übermensch and the will to power.
 What is phenomenology and how did Husserl originate it?
 Explain John Rawls's veil of ignorance and its role in his theory of justice.
 What is pragmatism and how do Peirce, James, and Dewey each develop it?
+Erkläre den Unterschied zwischen Konsequentialismus und Deontologie mit je einem Beispiel.
+Was ist der Gesellschaftsvertrag und worin unterscheiden sich Hobbes, Locke und Rousseau dazu?
+Beschreibe Kants kategorischen Imperativ und gib eine konkrete Anwendung.
+Was ist der Existenzialismus und worin unterscheiden sich Sartre und Camus zur Frage des Sinns?
+Erkläre das Trolley-Problem und diskutiere, ob die Fat-Man-Variante die moralische Kalkulation verändert.
+Was ist Platons Höhlengleichnis und was argumentiert es über Wissen?
+Beschreibe Nietzsches Konzept des Übermenschen und den Willen zur Macht.
+Was ist die Phänomenologie und wie begründete Husserl sie?
+Erkläre John Rawls' Schleier des Nichtwissens und seine Rolle in seiner Gerechtigkeitstheorie.
+Was ist der Pragmatismus und wie entwickeln Peirce, James und Dewey ihn jeweils?
+Explique la différence entre conséquentialisme et déontologie avec un exemple chacun.
+Qu'est-ce que le contrat social et comment Hobbes, Locke et Rousseau diffèrent-ils à ce sujet ?
+Décris l'impératif catégorique de Kant et donne une application concrète.
+Qu'est-ce que l'existentialisme et comment Sartre et Camus diffèrent-ils sur la question du sens ?
+Explique le problème du tramway et discute si la variante de l'homme gros change le calcul moral.
+Qu'est-ce que l'allégorie de la caverne de Platon et qu'argumente-t-elle sur la connaissance ?
+Décris le concept de surhomme de Nietzsche et la volonté de puissance.
+Qu'est-ce que la phénoménologie et comment Husserl l'a-t-il fondée ?
+Explique le voile d'ignorance de John Rawls et son rôle dans sa théorie de la justice.
+Qu'est-ce que le pragmatisme et comment Peirce, James et Dewey le développent-ils chacun ?

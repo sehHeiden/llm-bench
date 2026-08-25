@@ -8,3 +8,23 @@ Describe the structure of benzene and explain resonance in aromatic compounds.
 What is a catalyst and how does it lower activation energy without being consumed?
 Explain electronegativity and how it determines molecular polarity.
 What is the difference between an exothermic and an endothermic reaction, and how is enthalpy measured?
+Erkläre den Unterschied zwischen Ionen-, kovalenter und metallischer Bindung mit je einem Beispiel.
+Was ist das Periodensystem und wie ist es nach Elektronenkonfiguration organisiert?
+Beschreibe den Unterschied zwischen einer Säure und einer Base nach Brønsted-Lowry und Lewis.
+Was ist eine Redoxreaktion und wie gleicht man sie in saurer Lösung aus?
+Erkläre das ideale Gasgesetz und wann reale Gase davon abweichen.
+Was ist Chiralität und warum ist sie in der pharmazeutischen Chemie bedeutend?
+Beschreibe die Struktur von Benzol und erkläre Resonanz in aromatischen Verbindungen.
+Was ist ein Katalysator und wie senkt er die Aktivierungsenergie, ohne verbraucht zu werden?
+Erkläre Elektronegativität und wie sie molekulare Polarität bestimmt.
+Was ist der Unterschied zwischen einer exothermen und einer endothermen Reaktion und wie wird Enthalpie gemessen?
+Explique la différence entre liaison ionique, covalente et métallique avec un exemple chacun.
+Qu'est-ce que le tableau périodique et comment est-il organisé par configuration électronique ?
+Décris la différence entre un acide et une base selon Brønsted-Lowry et Lewis.
+Qu'est-ce qu'une réaction d'oxydoréduction et comment l'équilibrer en solution acide ?
+Explique la loi des gaz parfaits et quand les gaz réels s'en écartent.
+Qu'est-ce que la chiralité et pourquoi est-elle importante en chimie pharmaceutique ?
+Décris la structure du benzène et explique la résonance dans les composés aromatiques.
+Qu'est-ce qu'un catalyseur et comment abaisse-t-il l'énergie d'activation sans être consommé ?
+Explique l'électronégativité et comment elle détermine la polarité moléculaire.
+Quelle est la différence entre une réaction exothermique et endothermique, et comment l'enthalpie est-elle mesurée ?

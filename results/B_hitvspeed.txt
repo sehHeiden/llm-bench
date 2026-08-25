@@ -1,0 +1,40 @@
+cold: req0 6.10 tok/s TTFT 2.12s VRAMhit 33.3%
+heat: req1 7.06 tok/s (discarded)
+heat: req2 6.93 tok/s (discarded)
+heat: req3 7.46 tok/s (discarded)
+heat: req4 7.39 tok/s (discarded)
+heat: req5 6.99 tok/s (discarded)
+heat: req6 7.32 tok/s (discarded)
+heat: req7 7.42 tok/s (discarded)
+heat: req8 7.34 tok/s (discarded)
+heat: req9 7.00 tok/s (discarded)
+heat: req10 7.29 tok/s (discarded)
+heat: req11 6.91 tok/s (discarded)
+heat: req12 7.38 tok/s (discarded)
+heat: req13 7.32 tok/s (discarded)
+heat: req14 7.35 tok/s (discarded)
+heat: req15 7.40 tok/s (discarded)
+heat: req16 7.39 tok/s (discarded)
+heat: req17 7.43 tok/s (discarded)
+heat: req18 6.98 tok/s (discarded)
+heat: req19 7.01 tok/s (discarded)
+warm: req20 6.87 tok/s TTFT 1.67s VRAMhit 95.3%
+warm: req21 6.88 tok/s TTFT 1.72s VRAMhit 95.3%
+warm: req22 6.91 tok/s TTFT 1.65s VRAMhit 95.3%
+warm: req23 6.42 tok/s TTFT 2.31s VRAMhit 95.3%
+warm: req24 6.89 tok/s TTFT 1.67s VRAMhit 95.3%
+warm: req25 7.24 tok/s TTFT 1.77s VRAMhit 95.3%
+warm: req26 6.46 tok/s TTFT 1.70s VRAMhit 95.3%
+warm: req27 7.27 tok/s TTFT 1.70s VRAMhit 95.3%
+warm: req28 7.24 tok/s TTFT 1.72s VRAMhit 95.3%
+warm: req29 6.88 tok/s TTFT 1.72s VRAMhit 95.3%
+---
+cold: 6.10 tok/s TTFT 2.12s VRAMhit 33.3%
+warm tok/s mean: 6.91
+warm tok/s mean stddev: 0.30
+warm VRAMhit % mean: 95.30
+warm VRAMhit % mean stddev: 0.00
+CPU mean: 48.7% (stddev 38.0%, n=369)
+GPU mean: 7.7% (stddev 6.7%, n=369)
+VRAM mean: 3.39 GB (stddev 2.10 GB)
+pushed: [standalone gb=5] | cold 6.10 tok/s | warm 6.91 tok/s | hit 95.3% | CPU 49% | GPU 8%

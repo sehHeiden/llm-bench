@@ -8,3 +8,23 @@ What are the four fundamental forces of nature and their relative strengths?
 Explain Maxwell's equations and their role in unifying electricity and magnetism.
 What is a black hole and how is the event horizon defined?
 Describe nuclear fission and fusion, and explain why fusion releases more energy per unit mass.
+Erkläre Newtons drei Bewegungsgesetze mit je einem Beispiel.
+Was ist der Unterschied zwischen spezieller und allgemeiner Relativitätstheorie?
+Beschreibe den photoelektrischen Effekt und warum er für die Quantentheorie wichtig war.
+Erkläre die Unschärferelation und ihre physikalische Bedeutung.
+Was ist Entropie in der Thermodynamik und wie hängt sie mit dem Zeitpfeil zusammen?
+Beschreibe das Doppelspaltexperiment und was es über Welle-Teilchen-Dualismus zeigt.
+Was sind die vier Grundkräfte der Natur und ihre relativen Stärken?
+Erkläre Maxwells Gleichungen und ihre Rolle bei der Vereinigung von Elektrizität und Magnetismus.
+Was ist ein Schwarzes Loch und wie ist der Ereignishorizont definiert?
+Beschreibe Kernspaltung und Kernfusion und erkläre, warum Fusion mehr Energie pro Masseneinheit freisetzt.
+Explique les trois lois du mouvement de Newton avec un exemple chacune.
+Quelle est la différence entre la relativité restreinte et la relativité générale ?
+Décris l'effet photoélectrique et pourquoi il était important pour la théorie quantique.
+Explique le principe d'incertitude et sa signification physique.
+Qu'est-ce que l'entropie en thermodynamique et comment se rapporte-t-elle à la flèche du temps ?
+Décris l'expérience des fentes de Young et ce qu'elle démontre sur la dualité onde-corpuscule.
+Quelles sont les quatre forces fondamentales de la nature et leurs forces relatives ?
+Explique les équations de Maxwell et leur rôle dans l'unification de l'électricité et du magnétisme.
+Qu'est-ce qu'un trou noir et comment l'horizon des événements est-il défini ?
+Décris la fission et la fusion nucléaires, et explique pourquoi la fusion libère plus d'énergie par unité de masse.

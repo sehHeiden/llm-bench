@@ -7,7 +7,10 @@ authors = [
     { name = "Sebastian Heiden", email = "sehHeiden@users.noreply.github.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "psutil>=7.2.2",
+    "pydantic-settings>=2.15.0",
+]
 
 [dependency-groups]
 dev = [
@@ -16,8 +19,11 @@ dev = [
 ]
 
 [project.scripts]
-serve-bench = "llm_bench.serve_bench:main"
-standalone-bench = "llm_bench.standalone_bench:main"
+bench = "llm_bench.bench:main"
+analyze = "llm_bench.analyze:main"
+notify = "llm_bench.notify:main"
+run-all = "llm_bench.run_all:main"
+run-llama = "llm_bench.run_llama:main"
 
 [build-system]
 requires = ["uv_build>=0.11.6,<0.12.0"]
@@ -46,5 +52,15 @@ unfixable = []
     "S603",    # subprocess.run
     "S607",    # subprocess with partial path
     "PLC0415", # imports inside functions
+    "CPY001",  # no copyright header (bench-tool)
+    "EXE001",  # shebang in library module
+    "PLR0913", # too many args (bench internal helpers)
+    "PLR0917", # too many positional args (bench internal helpers)
+    "TRY004",  # TypeError vs ValueError (bench parsing)
+    "EM102",   # exception with f-string (bench)
+    "TRY003",  # long exception messages (bench)
 ]
+
+[tool.ty.environment]
+python-version = "3.13"
 

@@ -51,18 +51,22 @@ chmod +x qwen36
 ```sh
 uv sync
 
-# colibri persistent serve (VRAM retained)
-./scripts/start_colibri_serve.sh 5 8888      # wait ~60s
-uv run serve-bench --url http://127.0.0.1:8888/v1/chat/completions \
-  --model glm-5.2-colibri --prompts prompts/math.txt
+# launch a server in background (llama serve / colibri serve)
+uv run bench start --backend llama --port 8888
+uv run bench start --backend colibri --container int4 --port 8888
 
-# colibri standalone (fresh process per prompt, heat accumulates)
-uv run standalone-bench --prompts prompts/math.txt --expert-gb 5
+# benchmark a running server (serve mode, Q1 cold / Q21-30 warm)
+uv run bench serve --mode llama --model qwen3.6-35b-a3b --prompts prompts/math.txt
+uv run bench serve --mode colibri --model qwen3.6-colibri --prompts prompts/math.txt
 
-# llama.cpp persistent serve
-./scripts/start_llama_serve.sh 8888          # wait ~45s
-uv run serve-bench --url http://127.0.0.1:8888/v1/chat/completions \
-  --model qwen3.6-35b-a3b --prompts prompts/math.txt
+# colibri standalone (fresh process per prompt, heat accumulates, VRAM hit rate)
+uv run bench standalone --prompts prompts/math.txt --snap ~/models/qwen36-35b-a3b-colibri-i4
+
+# all 18 series (6 domains x 3 backends), results → results/bench.log
+uv run run-all
+
+# parse results into a Markdown comparison table → results/table.md
+uv run analyze
 ```
 
 ## First results (Issue #1040, comment 2026-08-16)

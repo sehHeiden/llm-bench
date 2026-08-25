@@ -8,3 +8,23 @@ A rectangle has area 24 and width 4. Find the perimeter.
 Solve: 2(x - 3) = 8. Find x.
 What is 15% of 480?
 Factor the polynomial x^2 + 7x + 12.
+Löse: 3x + 7 = 22. Finde x.
+Was ist 17 * 23? Zeige die Schritte.
+Wenn ein Zug 60 km/h für 2,5 Stunden fährt, wie weit kommt er?
+Löse die quadratische Gleichung x^2 - 5x + 6 = 0.
+Berechne die Ableitung von f(x) = 3x^3 - 2x + 5.
+Was ist das Integral von 2x dx von 0 bis 4?
+Ein Rechteck hat Fläche 24 und Breite 4. Finde den Umfang.
+Löse: 2(x - 3) = 8. Finde x.
+Was sind 15 % von 480?
+Faktorisiere das Polynom x^2 + 7x + 12.
+Résous : 3x + 7 = 22. Trouve x.
+Combien fait 17 * 23 ? Montre les étapes.
+Si un train roule à 60 km/h pendant 2,5 heures, quelle distance parcourt-il ?
+Résous l'équation quadratique x^2 - 5x + 6 = 0.
+Calcule la dérivée de f(x) = 3x^3 - 2x + 5.
+Quelle est l'intégrale de 2x dx de 0 à 4 ?
+Un rectangle a une aire de 24 et une largeur de 4. Trouve le périmètre.
+Résous : 2(x - 3) = 8. Trouve x.
+Combien font 15 % de 480 ?
+Factorise le polynôme x^2 + 7x + 12.

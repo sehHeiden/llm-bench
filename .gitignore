@@ -7,3 +7,4 @@ dist/
 build/
 /tmp/q36_*.heat
 /tmp/q36_*.log
+config/ntfy.env
