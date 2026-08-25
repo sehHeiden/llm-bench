@@ -1,10 +1,5 @@
-"""
-Push a message to ntfy. Topic/server come from config/ntfy.env (pydantic-settings).
+"""Push a message to ntfy. Topic/server come from config/ntfy.env (pydantic-settings)."""
 
-Usage: uv run notify "message text"
-"""
-
-import sys
 import urllib.request
 from pathlib import Path
 
@@ -36,12 +31,3 @@ def notify(msg: str) -> None:
         print(f"pushed: {msg}")
     except OSError as e:
         print(f"ntfy push failed: {e}")
-
-
-def main() -> None:
-    """Send argv[1] as ntfy message."""
-    notify(" ".join(sys.argv[1:]) or "llm-bench fertig")
-
-
-if __name__ == "__main__":
-    main()

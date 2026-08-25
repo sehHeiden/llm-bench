@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "pyright-env-false-positives": {
+      "disable": [
+        "reportMissingImports",
+        "reportAttributeAccessIssue"
+      ]
+    }
+  }
+}
