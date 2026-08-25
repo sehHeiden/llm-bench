@@ -1,0 +1,271 @@
+=== llm-bench results (2026-08-24T14:12:16) ===
+Protocol: Q1-10 EN, Q11-20 DE, Q21-30 FR. colibri: Q1=cold, Q2-20=heat, Q21-30=warm (standalone, VRAM hit rate). llama: Q1-30=series (serve).
+GTX 1660 Ti / 6GB / sm_75, CUDA_EXPERT_GB=5
+Backends: llama
+
+
+[math | llama]
+req0 16.33 tok/s
+Traceback (most recent call last):
+  File "/home/sebastianh/Dokumente/Programmierung/LLM/llm-bench/.venv/bin/bench", line 10, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/sebastianh/Dokumente/Programmierung/LLM/llm-bench/src/llm_bench/bench.py", line 404, in main
+    args.func(args)
+    ~~~~~~~~~^^^^^^
+  File "/home/sebastianh/Dokumente/Programmierung/LLM/llm-bench/src/llm_bench/bench.py", line 261, in cmd_serve
+    tps = _request(args.url, args.model, p, args.max_tokens, i)
+  File "/home/sebastianh/Dokumente/Programmierung/LLM/llm-bench/src/llm_bench/bench.py", line 164, in _request
+    r = urllib.request.urlopen(
+        urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}),
+        timeout=300,
+    )
+  File "/home/sebastianh/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py", line 189, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/home/sebastianh/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py", line 489, in open
+    response = self._open(req, data)
+  File "/home/sebastianh/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py", line 506, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+                              '_open', req)
+  File "/home/sebastianh/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py", line 466, in _call_chain
+    result = func(*args)
+  File "/home/sebastianh/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py", line 1348, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sebastianh/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/urllib/request.py", line 1323, in do_open
+    r = h.getresponse()
+  File "/home/sebastianh/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/client.py", line 1450, in getresponse
+    response.begin()
+    ~~~~~~~~~~~~~~^^
+  File "/home/sebastianh/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/client.py", line 336, in begin
+    version, status, reason = self._read_status()
+                              ~~~~~~~~~~~~~~~~~^^
+  File "/home/sebastianh/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/client.py", line 305, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+                             " response")
+http.client.RemoteDisconnected: Remote end closed connection without response
+
+
+[geography | llama]
+req0 19.75 tok/s
+req1 19.78 tok/s
+req2 18.84 tok/s
+req3 17.73 tok/s
+req4 19.35 tok/s
+req5 19.15 tok/s
+req6 19.93 tok/s
+req7 19.79 tok/s
+req8 20.31 tok/s
+req9 20.16 tok/s
+req10 19.79 tok/s
+req11 20.02 tok/s
+req12 19.46 tok/s
+req13 19.10 tok/s
+req14 19.06 tok/s
+req15 19.06 tok/s
+req16 16.98 tok/s
+req17 16.83 tok/s
+req18 18.97 tok/s
+req19 18.98 tok/s
+req20 18.93 tok/s
+req21 19.70 tok/s
+req22 19.17 tok/s
+req23 19.31 tok/s
+req24 19.54 tok/s
+req25 19.58 tok/s
+req26 18.83 tok/s
+req27 19.66 tok/s
+req28 19.37 tok/s
+req29 19.62 tok/s
+---
+warm mean: 19.22 tok/s
+warm stddev: 0.81 tok/s
+no samples
+
+
+[geography | llama]
+req0 20.35 tok/s
+req1 20.09 tok/s
+req2 20.40 tok/s
+req3 20.41 tok/s
+req4 20.11 tok/s
+req5 20.17 tok/s
+req6 19.92 tok/s
+req7 19.84 tok/s
+req8 19.58 tok/s
+req9 19.82 tok/s
+req10 19.92 tok/s
+req11 19.37 tok/s
+req12 19.48 tok/s
+req13 19.93 tok/s
+req14 19.66 tok/s
+req15 20.54 tok/s
+req16 19.09 tok/s
+req17 19.06 tok/s
+req18 18.13 tok/s
+req19 19.86 tok/s
+req20 19.47 tok/s
+req21 19.32 tok/s
+req22 19.81 tok/s
+req23 19.68 tok/s
+req24 19.01 tok/s
+req25 20.34 tok/s
+req26 18.97 tok/s
+req27 18.47 tok/s
+req28 19.17 tok/s
+req29 19.32 tok/s
+---
+warm mean: 19.64 tok/s
+warm stddev: 0.58 tok/s
+no samples
+
+
+[history | llama]
+req0 19.45 tok/s
+req1 20.04 tok/s
+req2 20.28 tok/s
+req3 19.63 tok/s
+req4 19.64 tok/s
+req5 19.98 tok/s
+req6 19.81 tok/s
+req7 20.02 tok/s
+req8 19.08 tok/s
+req9 20.23 tok/s
+req10 18.98 tok/s
+req11 18.50 tok/s
+req12 19.64 tok/s
+req13 19.29 tok/s
+req14 19.11 tok/s
+req15 19.36 tok/s
+req16 18.29 tok/s
+req17 18.95 tok/s
+req18 18.41 tok/s
+req19 19.12 tok/s
+req20 18.62 tok/s
+req21 19.02 tok/s
+req22 19.03 tok/s
+req23 18.64 tok/s
+req24 19.10 tok/s
+req25 19.16 tok/s
+req26 18.32 tok/s
+req27 18.62 tok/s
+req28 18.50 tok/s
+req29 19.12 tok/s
+---
+warm mean: 19.20 tok/s
+warm stddev: 0.58 tok/s
+no samples
+
+
+[philosophy | llama]
+req0 19.91 tok/s
+req1 19.36 tok/s
+req2 19.27 tok/s
+req3 19.27 tok/s
+req4 18.15 tok/s
+req5 16.24 tok/s
+req6 16.31 tok/s
+req7 16.64 tok/s
+req8 16.24 tok/s
+req9 15.94 tok/s
+req10 16.06 tok/s
+req11 18.51 tok/s
+req12 19.73 tok/s
+req13 18.86 tok/s
+req14 18.30 tok/s
+req15 19.17 tok/s
+req16 19.29 tok/s
+req17 19.36 tok/s
+req18 19.03 tok/s
+req19 18.95 tok/s
+req20 19.43 tok/s
+req21 19.30 tok/s
+req22 19.12 tok/s
+req23 19.06 tok/s
+req24 18.03 tok/s
+req25 18.64 tok/s
+req26 19.36 tok/s
+req27 18.99 tok/s
+req28 18.87 tok/s
+req29 18.90 tok/s
+---
+warm mean: 18.48 tok/s
+warm stddev: 1.21 tok/s
+no samples
+
+
+[physics | llama]
+req0 20.32 tok/s
+req1 20.39 tok/s
+req2 20.03 tok/s
+req3 20.24 tok/s
+req4 18.65 tok/s
+req5 19.56 tok/s
+req6 20.10 tok/s
+req7 19.71 tok/s
+req8 19.95 tok/s
+req9 19.37 tok/s
+req10 19.22 tok/s
+req11 19.44 tok/s
+req12 19.19 tok/s
+req13 19.33 tok/s
+req14 18.60 tok/s
+req15 18.83 tok/s
+req16 19.72 tok/s
+req17 18.79 tok/s
+req18 19.45 tok/s
+req19 18.89 tok/s
+req20 19.70 tok/s
+req21 19.32 tok/s
+req22 18.99 tok/s
+req23 19.48 tok/s
+req24 18.61 tok/s
+req25 18.25 tok/s
+req26 19.51 tok/s
+req27 18.52 tok/s
+req28 18.63 tok/s
+req29 18.87 tok/s
+---
+warm mean: 19.32 tok/s
+warm stddev: 0.58 tok/s
+no samples
+
+
+[chemistry | llama]
+req0 19.52 tok/s
+req1 20.12 tok/s
+req2 19.21 tok/s
+req3 19.24 tok/s
+req4 19.62 tok/s
+req5 20.03 tok/s
+req6 20.04 tok/s
+req7 19.83 tok/s
+req8 20.03 tok/s
+req9 19.23 tok/s
+req10 19.01 tok/s
+req11 19.40 tok/s
+req12 19.00 tok/s
+req13 18.92 tok/s
+req14 19.25 tok/s
+req15 19.23 tok/s
+req16 19.04 tok/s
+req17 19.34 tok/s
+req18 19.26 tok/s
+req19 18.92 tok/s
+req20 18.30 tok/s
+req21 18.99 tok/s
+req22 18.75 tok/s
+req23 18.75 tok/s
+req24 18.55 tok/s
+req25 18.90 tok/s
+req26 18.98 tok/s
+req27 18.98 tok/s
+req28 19.00 tok/s
+req29 18.89 tok/s
+---
+warm mean: 19.21 tok/s
+warm stddev: 0.45 tok/s
+no samples
+
+=== done 2026-08-24T14:34:38 ===
