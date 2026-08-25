@@ -4,6 +4,7 @@
 **Model:** Qwen3.6-35B-A3B (MoE, 35B total / 3B active, 256 experts/layer, 40 layers)
 **Prompts:** 30 per domain (Q1-10 EN, Q11-20 DE, Q21-30 FR), 100 max tokens
 **Date:** August 2026
+**Repo:** <https://github.com/sehHeiden/llm-bench> (benchmark code + full result logs)
 
 ---
 
