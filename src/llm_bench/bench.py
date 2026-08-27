@@ -20,7 +20,6 @@ Usage:
   uv run bench analyze [--log results/bench.log] [--out results/table.md]
 """
 
-import argparse
 import contextlib
 import io
 import json
@@ -40,6 +39,7 @@ from pathlib import Path
 
 import psutil
 from pydantic import BaseModel, ValidationError
+from pydantic_settings import BaseSettings, CliApp, CliSubCommand, SettingsConfigDict
 
 from .notify import notify
 
@@ -51,6 +51,21 @@ RETRY_WAIT = 10
 HTTP_OK = 200
 HTTP_SERVICE_UNAVAILABLE = 503
 
+
+class Backend(StrEnum):
+    """Which engine runs the series."""
+
+    llama = "llama"
+    colibri = "colibri"
+
+
+class Container(StrEnum):
+    """colibri quant container variant."""
+
+    int4 = "int4"
+    gs64 = "gs64"
+
+
 COLIBRI_INT4 = Path.home() / "models/qwen36-35b-a3b-colibri-i4"
 COLIBRI_GS64 = Path.home() / "models/qwen36-35b-a3b-colibri-i4-gs64"
 LLAMA_WRAPPER = Path.home() / "bin/llama-server-qwen.sh"
@@ -58,17 +73,13 @@ REPO = Path(__file__).resolve().parents[2]
 DOMAINS = ["math", "geography", "history", "philosophy", "physics", "chemistry"]
 BACKENDS = ["llama", "colibri-int4", "colibri-gs64"]
 LLAMA_LOAD = 45  # seconds for the llama model to load before series start
+NIX_CUDA = "nix-shell -p cudaPackages_12.cuda_cudart cudaPackages_12.cuda_cccl cudaPackages_12.libcublas"
 
 
 class ResourceSampler:
     """Background thread sampling CPU% and GPU%+VRAM during bench."""
 
-    _GPU_NSMI_ARGS = (
-        "nvidia-smi",
-        "--query-gpu=utilization.gpu,memory.used",
-        "--format=csv,noheader,nounits",
-    )
-    _GPU_MIN_PARTS = 2
+    _NSMI = ("nvidia-smi", "--query-gpu=utilization.gpu,memory.used", "--format=csv,noheader,nounits")
 
     def __init__(self) -> None:
         """Initialize empty sample lists and stop event."""
@@ -79,7 +90,9 @@ class ResourceSampler:
         self.vram_mb: list[float] = []
 
     def start(self) -> None:
-        """Start the sampler thread."""
+        """Start the sampler thread; idempotent."""
+        if self._thread and self._thread.is_alive():
+            return
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
 
@@ -93,67 +106,170 @@ class ResourceSampler:
         psutil.cpu_percent(interval=None)  # prime
         while not self._stop.is_set():
             self.cpu.append(psutil.cpu_percent(interval=None))
-            self._sample_gpu()
+            try:
+                out = subprocess.run(self._NSMI, capture_output=True, text=True, check=False, timeout=5).stdout
+                gpu, vram = (float(x) for x in out.strip().split(", "))
+                self.gpu.append(gpu)
+                self.vram_mb.append(vram)
+            except (OSError, subprocess.TimeoutExpired, ValueError):
+                pass  # no GPU / malformed output: skip sample
             self._stop.wait(1.0)
 
-    def _sample_gpu(self) -> None:
-        try:
-            r = subprocess.run(self._GPU_NSMI_ARGS, capture_output=True, text=True, check=False, timeout=5)
-        except (OSError, subprocess.TimeoutExpired):
-            return
-        if r.returncode != 0 or not r.stdout.strip():
-            return
-        parts = r.stdout.strip().split(", ")
-        if len(parts) < self._GPU_MIN_PARTS:
-            return
-        try:
-            self.gpu.append(float(parts[0]))
-            self.vram_mb.append(float(parts[1]))
-        except ValueError:
-            return  # malformed output, skip sample
-
-    @staticmethod
-    def mean_std(values: list[float]) -> tuple[float | None, float | None]:
-        """Return (mean, stddev) of a sample list, or (None, None) if empty."""
-        if not values:
-            return None, None
-        mean = statistics.mean(values)
-        std = statistics.stdev(values) if len(values) >= STDDEV_MIN else 0.0
-        return round(mean, 1), round(std, 1)
-
     def report(self) -> str:
-        """Return formatted mean+stddev for CPU, GPU, VRAM."""
+        """Format mean+stddev lines for CPU, GPU, VRAM."""
         lines = []
-        cpu_m, cpu_s = self.mean_std(self.cpu)
-        gpu_m, gpu_s = self.mean_std(self.gpu)
-        vram_m, vram_s = self.mean_std(self.vram_mb)
-        if cpu_m is not None:
-            lines.append(f"CPU mean: {cpu_m}% (stddev {cpu_s}%, n={len(self.cpu)})")
-        if gpu_m is not None:
-            lines.append(f"GPU mean: {gpu_m}% (stddev {gpu_s}%, n={len(self.gpu)})")
-        if vram_m is not None and vram_s is not None:
-            lines.append(f"VRAM mean: {vram_m / 1024:.2f} GB (stddev {vram_s / 1024:.2f} GB)")
+        for label, values, div, unit in (
+            ("CPU", self.cpu, 1, "%"),
+            ("GPU", self.gpu, 1, "%"),
+            ("VRAM", self.vram_mb, 1024, " GB"),
+        ):
+            m, s = _mean_std(values)
+            if m is None:
+                continue
+            line = f"{label} mean: {m / div:.2f}{unit}, n={len(values)}"
+            if s is not None:
+                line += f" (stddev {s / div:.2f}{unit})"
+            lines.append(line)
         return "\n".join(lines) if lines else "no samples"
 
+    def stats(self) -> tuple[float | None, float | None, float | None]:
+        """(cpu_warm, gpu_warm, vram_warm in GB)."""
+        cpu_m, _ = _mean_std(self.cpu)
+        gpu_m, _ = _mean_std(self.gpu)
+        vram_m, _ = _mean_std(self.vram_mb)
+        return cpu_m, gpu_m, round(vram_m / 1024, 2) if vram_m else None
 
-def _grep(pattern: str, text: str, *, multiline: bool = False) -> str:
-    """Return first regex group match or '-'."""
-    flags = re.MULTILINE if multiline else 0
-    m = re.search(pattern, text, flags)
-    return m.group(1) if m else "-"
+
+def _grep(pattern: str, text: str, *, multiline: bool = False) -> str | None:
+    """First regex group match or None."""
+    if m := re.search(pattern, text, re.MULTILINE if multiline else 0):
+        return m.group(1)
+    return None
 
 
-def _mean_std(values: list[float], label: str) -> None:
-    """Print mean and stddev of a metric list."""
+def _mean_std(values: list[float]) -> tuple[float | None, float | None]:
+    """(mean, stddev), stddev 0.0 until n >= STDDEV_MIN; (None, None) if empty."""
     if not values:
-        print(f"{label}: n/a")
-        return
-    print(f"{label}: {statistics.mean(values):.2f}")
-    if len(values) >= STDDEV_MIN:
-        print(f"{label} stddev: {statistics.stdev(values):.2f}")
+        return None, None
+    return statistics.mean(values), statistics.stdev(values) if len(values) >= STDDEV_MIN else 0.0
+
+
+def _phase(i: int, *, all_warm: bool = False) -> str:
+    """Q protocol phase: 0=cold, 1..HEAT_LAST=heat (discarded), rest=warm."""
+    if all_warm or i > HEAT_LAST:
+        return "warm"
+    return "cold" if i == 0 else "heat"
+
+
+# ---- CLI (pydantic-settings subcommands, replaces argparse) ----
+
+
+class StartArgs(BaseSettings):
+    """Launch a server in background."""
+
+    backend: Backend
+    port: int = 8888
+    expert_gb: str = "5"
+    container: Container = Container.int4
+    snap: Path | None = None
+
+    def cli_cmd(self) -> None:
+        """Dispatch to the command implementation."""
+        cmd_start(self)
+
+
+class ServeArgs(BaseSettings):
+    """Benchmark a running server."""
+
+    url: str = "http://127.0.0.1:8888/v1/chat/completions"
+    model: str = "qwen3.6-colibri"
+    prompts: Path = Path("prompts/math.txt")
+    max_tokens: int = 100
+    mode: Backend = Backend.colibri
+
+    def cli_cmd(self) -> None:
+        """Dispatch to the command implementation."""
+        cmd_serve(self)
+
+
+class StandaloneArgs(BaseSettings):
+    """colibri standalone, fresh process per prompt."""
+
+    prompts: Path = Path("prompts/math.txt")
+    expert_gb: str = "5"
+    engine: Path = Path.home() / "src/colibri/c/qwen36.real"
+    snap: Path = Path.home() / "models/qwen36-35b-a3b-colibri-i4"
+    n_new: str = "100"
+    heat: Path = Path("/tmp/q36_standalone.heat")
+    cuda: bool = True
+
+    def cli_cmd(self) -> None:
+        """Dispatch to the command implementation."""
+        cmd_standalone(self)
+
+
+class RunAllArgs(BaseSettings):
+    """Orchestrate all series (6 domains x backends) -> results/bench.log."""
+
+    domains: str = ",".join(DOMAINS)
+    backends: str = ",".join(BACKENDS)
+    runs: Path | None = None  # JSON list of Run definitions; overrides --domains/--backends
+
+    def cli_cmd(self) -> None:
+        """Dispatch to the command implementation."""
+        cmd_run_all(self)
+
+
+class AnalyzeArgs(BaseSettings):
+    """Parse results/bench.log into a Markdown table."""
+
+    log: Path = Path("results/bench.log")
+    out: Path = Path("results/table.md")
+
+    def cli_cmd(self) -> None:
+        """Dispatch to the command implementation."""
+        cmd_analyze(self)
+
+
+class Bench(BaseSettings):
+    """llm-bench CLI: bench <subcommand> [options]."""
+
+    model_config = SettingsConfigDict(cli_kebab_case="all")  # enum choices lowercase: LLAMA -> llama
+
+    start: CliSubCommand[StartArgs]
+    serve: CliSubCommand[ServeArgs]
+    standalone: CliSubCommand[StandaloneArgs]
+    run_all: CliSubCommand[RunAllArgs]
+    analyze: CliSubCommand[AnalyzeArgs]
+
+    def cli_cmd(self) -> None:
+        """Dispatch to the command implementation."""
+        CliApp.run_subcommand(self)
+
+
+def _load_prompts(path: Path) -> list[str]:
+    """Read the prompts file; enforce the 30-question protocol length."""
+    prompts = path.read_text().strip().splitlines()
+    if len(prompts) < N_PROMPTS:
+        raise SystemExit(f"need {N_PROMPTS} prompts, got {len(prompts)}")
+    return prompts
+
+
+def _spawn(log: Path, argv: list[str], env: dict[str, str] | None = None) -> None:
+    """Start a detached background process, output merged into log."""
+    with log.open("w") as fh:
+        subprocess.Popen(argv, stdout=fh, stderr=subprocess.STDOUT, start_new_session=True, env=env)
 
 
 # ---- serve (persistent server) ----
+
+
+def _retry(e: Exception, idx: int, attempt: int) -> None:
+    """Sleep for the next retry, or give up when retries are exhausted."""
+    if attempt >= RETRY_MAX - 1:
+        raise e
+    print(f"  [req {idx}] {e}, retry {attempt + 1}/{RETRY_MAX} in {RETRY_WAIT}s...")
+    time.sleep(RETRY_WAIT)
 
 
 def _request(url: str, model: str, prompt: str, max_tokens: int, idx: int) -> float:
@@ -176,16 +292,10 @@ def _request(url: str, model: str, prompt: str, max_tokens: int, idx: int) -> fl
         except urllib.error.HTTPError as e:
             if e.code != HTTP_SERVICE_UNAVAILABLE:
                 raise
-            if attempt >= RETRY_MAX - 1:
-                raise
-            print(f"  [req {idx}] 503, retry {attempt + 1}/{RETRY_MAX} in {RETRY_WAIT}s...")
-            time.sleep(RETRY_WAIT)
+            _retry(e, idx, attempt)
             continue
         except urllib.error.URLError as e:
-            if attempt >= RETRY_MAX - 1:
-                raise
-            print(f"  [req {idx}] connection error: {e}, retry {attempt + 1}/{RETRY_MAX} in {RETRY_WAIT}s...")
-            time.sleep(RETRY_WAIT)
+            _retry(e, idx, attempt)
             continue
         raw = r.read()
         try:
@@ -213,38 +323,29 @@ def _wait_for_port(port: int, timeout: int = 180) -> bool:
     return False
 
 
-def cmd_start(args: argparse.Namespace) -> None:
+def cmd_start(args: StartArgs) -> None:
     """Launch a server (colibri or llama) in background via nix-shell."""
     port = args.port
-    if Backend(args.backend) is Backend.LLAMA:
+    if args.backend is Backend.llama:
         log = Path(f"/tmp/llama_serve_{port}.log")
-        with log.open("w") as fh:
-            subprocess.Popen(
-                [str(LLAMA_WRAPPER)],
-                stdout=fh,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-            )
+        _spawn(log, [str(LLAMA_WRAPPER)])
         print(f"started llama serve on port {port} (log {log})")
     else:  # colibri
-        snap = str(args.snap or (COLIBRI_GS64 if Container(args.container) is Container.GS64 else COLIBRI_INT4))
-        expert_gb = args.expert_gb
+        snap = str(args.snap or (COLIBRI_GS64 if args.container is Container.gs64 else COLIBRI_INT4))
         log = Path(f"/tmp/q36_serve_{port}.log")
-        cmd = (
-            f"nix-shell -p cudaPackages_12.cuda_cudart cudaPackages_12.cuda_cccl "
-            f"cudaPackages_12.libcublas python3 gmp --run "
-            f"'cd ~/src/colibri/c && COLI_CUDA=1 COLI_GPUS=0 CUDA_EXPERT_GB={expert_gb} "
-            f"HEAT_FILE=/tmp/q36_serve.heat COLI_MODEL={snap} "
-            f"python3 ./coli serve --model {snap} --cap 256 --port {port}'"
+        _spawn(
+            log,
+            [
+                "bash",
+                "-c",
+                (
+                    f"{NIX_CUDA} python3 gmp --run 'cd ~/src/colibri/c && COLI_CUDA=1 COLI_GPUS=0 "
+                    f"CUDA_EXPERT_GB={args.expert_gb} HEAT_FILE=/tmp/q36_serve.heat COLI_MODEL={snap} "
+                    f"python3 ./coli serve --model {snap} --cap 256 --port {port}'"
+                ),
+            ],
+            env={**os.environ, "HOME": str(Path.home())},
         )
-        with log.open("w") as fh:
-            subprocess.Popen(
-                ["bash", "-c", cmd],
-                stdout=fh,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-                env={**os.environ, "HOME": str(Path.home())},
-            )
         print(f"started colibri serve ({args.container}) on port {port} (log {log})")
     print(f"waiting for port {port}...")
     if _wait_for_port(port):
@@ -253,83 +354,45 @@ def cmd_start(args: argparse.Namespace) -> None:
         print(f"✗ port {port} not up after 180s — check {log}")
 
 
-def cmd_serve(args: argparse.Namespace) -> None:
+def cmd_serve(args: ServeArgs) -> None:
     """Benchmark a running server (colibri or llama), Q1/Q2-20/Q21-30 protocol."""
-    prompts = Path(args.prompts).read_text().strip().splitlines()
-    if len(prompts) < N_PROMPTS:
-        msg = f"need {N_PROMPTS} prompts, got {len(prompts)}"
-        raise SystemExit(msg)
-
+    prompts = _load_prompts(args.prompts)
     cold: float | None = None
     warm: list[float] = []
     sampler = ResourceSampler()
-    sampler_started = False
-    mode = Backend(args.mode)
 
     for i, p in enumerate(prompts):
         tps = _request(args.url, args.model, p, args.max_tokens, i)
-        if mode is Backend.COLIBRI:
-            if i == 0:
-                cold = tps
-                print(f"cold: req{i} {tps:.2f} tok/s")
-            elif 1 <= i <= HEAT_LAST:
-                print(f"heat: req{i} {tps:.2f} tok/s (discarded)")
-            else:
-                if not sampler_started:
-                    sampler.start()
-                    sampler_started = True
-                warm.append(tps)
-                print(f"warm: req{i} {tps:.2f} tok/s")
-        else:
+        ph = _phase(i, all_warm=args.mode is Backend.llama)
+        if ph == "warm":
+            sampler.start()
             warm.append(tps)
-            print(f"req{i} {tps:.2f} tok/s")
+        elif ph == "cold" and cold is None:
+            cold = tps
+        print(f"{ph}: req{i} {tps:.2f} tok/s" + (" (discarded)" if ph == "heat" else ""))
 
     sampler.stop()
     print("---")
     if cold is not None:
         print(f"cold: {cold:.2f} tok/s")
-    warm_mean = statistics.mean(warm) if warm else None
-    warm_std = statistics.stdev(warm) if len(warm) >= STDDEV_MIN else None
+    warm_mean, warm_std = _mean_std(warm)
     if warm_mean is not None:
         print(f"warm mean: {warm_mean:.2f} tok/s")
-        print(f"warm stddev: {warm_std:.2f} tok/s" if warm_std is not None else "warm stddev: n/a")
+        print(f"warm stddev: {warm_std:.2f} tok/s" if len(warm) >= STDDEV_MIN else "warm stddev: n/a")
     print(sampler.report())
-    cpu_m, _ = sampler.mean_std(sampler.cpu)
-    gpu_m, _ = sampler.mean_std(sampler.gpu)
-    vram_m, _ = sampler.mean_std(sampler.vram_mb)
-    payload = {
-        "cold_tps": cold,
-        "warm_tps": warm_mean,
-        "warm_sd": warm_std,
-        "cpu_warm": cpu_m,
-        "gpu_warm": gpu_m,
-        "vram_warm": round(vram_m / 1024, 2) if vram_m else None,
-    }
-    print(f"JSON: {json.dumps(payload)}")
+    cpu_warm, gpu_warm, vram_warm = sampler.stats()
+    metrics = SeriesMetrics(
+        cold_tps=cold,
+        warm_tps=warm_mean,
+        warm_sd=warm_std if len(warm) >= STDDEV_MIN else None,
+        cpu_warm=cpu_warm,
+        gpu_warm=gpu_warm,
+        vram_warm=vram_warm,
+    )
+    print(f"JSON: {metrics.model_dump_json()}")
 
 
 # ---- models (input/output contract for run-all + analyze) ----
-
-
-class Backend(StrEnum):
-    """Which engine runs the series."""
-
-    LLAMA = "llama"
-    COLIBRI = "colibri"
-
-
-class Mode(StrEnum):
-    """How the series is executed."""
-
-    SERVE = "serve"
-    STANDALONE = "standalone"
-
-
-class Container(StrEnum):
-    """colibri quant container variant."""
-
-    INT4 = "int4"
-    GS64 = "gs64"
 
 
 class Run(BaseModel):
@@ -341,10 +404,9 @@ class Run(BaseModel):
 
     name: str  # "<domain> | <backend>", e.g. "math | llama"
     backend: Backend
-    mode: Mode
     model: str
     prompts: Path
-    container: Container = Container.INT4
+    container: Container = Container.int4
     snap: Path | None = None
     expert_gb: str = "5"
     max_tokens: int = 100
@@ -363,8 +425,6 @@ class Probe(BaseModel):
     speed: float | None = None
     ttft: float | None = None
     vhit: float | None = None
-    cmiss: float | None = None
-    rhit: float | None = None
 
 
 class SeriesMetrics(BaseModel):
@@ -375,7 +435,7 @@ class SeriesMetrics(BaseModel):
     and table.md renders each as one row (None -> '-').
     """
 
-    name: str
+    name: str = ""
     cold_tps: float | None = None
     cold_ttft: float | None = None
     cold_vhit: float | None = None
@@ -431,17 +491,17 @@ def _json_line(line: str) -> dict[str, object] | None:
         return None
 
 
-def cmd_analyze(args: argparse.Namespace) -> None:
+def cmd_analyze(args: AnalyzeArgs) -> None:
     """Render the JSON lines of results/bench.log as a Markdown table."""
     name = ""
     rows: list[SeriesMetrics] = []
-    for line in Path(args.log).read_text().splitlines():
+    for line in args.log.read_text().splitlines():
         if line.startswith("["):
             name = line.strip("[]")
         elif (data := _json_line(line)) is not None:
             rows.append(SeriesMetrics.model_validate({"name": name, **data}))
     table = _table(rows)
-    Path(args.out).write_text(table + "\n")
+    args.out.write_text(table + "\n")
     print(table)
 
 
@@ -455,11 +515,11 @@ def _kill_server() -> None:
     time.sleep(5)
 
 
-def _captured(func: Callable[[argparse.Namespace], None], namespace: argparse.Namespace) -> str:
+def _captured(func: Callable[[ServeArgs], None], args: ServeArgs) -> str:
     """Run func in-process, return merged stdout+stderr as a string."""
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
-        func(namespace)
+        func(args)
     return buf.getvalue()
 
 
@@ -468,11 +528,10 @@ def _default_runs(domains: list[str], backends: list[str]) -> list[Run]:
     return [
         Run(
             name=f"{domain} | {backend}",
-            backend=Backend.LLAMA if backend == "llama" else Backend.COLIBRI,
-            mode=Mode.SERVE if backend == "llama" else Mode.STANDALONE,
+            backend=Backend.llama if backend == "llama" else Backend.colibri,
             model="qwen3.6-35b-a3b" if backend == "llama" else "qwen3.6-colibri",
             prompts=REPO / f"prompts/{domain}.txt",
-            container=Container.INT4 if backend == "colibri-int4" else Container.GS64,
+            container=Container.int4 if backend == "colibri-int4" else Container.gs64,
             snap=None if backend == "llama" else (COLIBRI_GS64 if backend == "colibri-gs64" else COLIBRI_INT4),
             heat=None if backend == "llama" else Path(f"/tmp/q36_{domain}_{backend}.heat"),
         )
@@ -490,23 +549,19 @@ def _series_run(run: Run) -> str:
     """
     print(f">>> {run.log_header} ({time.strftime('%H:%M:%S')})")
     _kill_server()
-    if run.mode is Mode.SERVE:
+    if run.backend is Backend.llama:
         cmd_start(
-            argparse.Namespace(
-                backend=run.backend,
-                port=run.port,
-                container=run.container,
-                snap=run.snap,
-                expert_gb=run.expert_gb,
+            StartArgs(
+                backend=run.backend, port=run.port, container=run.container, snap=run.snap, expert_gb=run.expert_gb
             )
         )
         time.sleep(LLAMA_LOAD)
         out = _captured(
             cmd_serve,
-            argparse.Namespace(
+            ServeArgs(
                 url=f"http://127.0.0.1:{run.port}/v1/chat/completions",
                 model=run.model,
-                prompts=str(run.prompts),
+                prompts=run.prompts,
                 max_tokens=run.max_tokens,
                 mode=run.backend,
             ),
@@ -519,14 +574,7 @@ def _series_run(run: Run) -> str:
             f"--heat {run.heat} --expert-gb {run.expert_gb}"
         )
         r = subprocess.run(
-            [
-                "bash",
-                "-lc",
-                (
-                    "nix-shell -p cudaPackages_12.cuda_cudart cudaPackages_12.cuda_cccl "
-                    f"cudaPackages_12.libcublas gmp --run '{inner}'"
-                ),
-            ],
+            ["bash", "-lc", f"{NIX_CUDA} gmp --run '{inner}'"],
             capture_output=True,
             text=True,
             check=False,
@@ -536,14 +584,14 @@ def _series_run(run: Run) -> str:
     return out
 
 
-def cmd_run_all(args: argparse.Namespace) -> None:
+def cmd_run_all(args: RunAllArgs) -> None:
     """Run all series from a run list, raw output -> results/bench.log."""
     log = REPO / "results" / "bench.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     runs = _default_runs(args.domains.split(","), args.backends.split(","))
     if args.runs:
         try:
-            runs = [Run(**r) for r in json.loads(Path(args.runs).read_text())]
+            runs = [Run(**r) for r in json.loads(args.runs.read_text())]
         except (OSError, json.JSONDecodeError, ValidationError) as e:
             sys.exit(f"--runs {args.runs}: {e}")
     log.write_text(
@@ -566,24 +614,22 @@ def cmd_run_all(args: argparse.Namespace) -> None:
 # ---- standalone (fresh process per prompt, colibri only) ----
 
 
-def _run_once(
-    engine: str, snap: str, expert_gb: str, n_new: str, heat: Path, prompt: str, *, cuda: bool = True
-) -> Probe:
+def _run_once(args: StandaloneArgs, heat: Path, prompt: str) -> Probe:
     """Run one standalone process, return parsed metrics as a typed Probe."""
     pf = Path(tempfile.mkstemp(suffix=".txt")[1])
     pf.write_text(prompt + "\n")
     env = {
         **os.environ,
         "LD_PRELOAD": "/usr/lib/x86_64-linux-gnu/libcuda.so.1",
-        "SNAP": snap,
-        "COLI_CUDA": "1" if cuda else "0",
+        "SNAP": str(args.snap),
+        "COLI_CUDA": "1" if args.cuda else "0",
         "COLI_GPUS": "0",
-        "CUDA_EXPERT_GB": expert_gb,
-        "N_NEW": n_new,
+        "CUDA_EXPERT_GB": args.expert_gb,
+        "N_NEW": args.n_new,
         "HEAT_FILE": str(heat),
     }
     r = subprocess.run(
-        [engine, "256", "4", str(pf)],
+        [str(args.engine), "256", "4", str(pf)],
         capture_output=True,
         text=True,
         env=env,
@@ -591,25 +637,19 @@ def _run_once(
         timeout=600,
     )
     pf.unlink()
-    raw = {
-        "speed": _grep(r"^Speed:\s*([\d.]+)", r.stderr, multiline=True),
-        "ttft": _grep(r"TTFT:\s*([\d.]+)", r.stderr),
-        "vhit": _grep(r"VRAM hit rate:\s*([\d.]+)", r.stderr),
-        "cmiss": _grep(r"miss\(CPU\)\s*(\d+)", r.stderr),
-        "rhit": _grep(r"Expert cache hit rate:\s*([\d.]+)", r.stderr),
-    }
-    clean: dict[str, str | None] = {k: (v if v != "-" else None) for k, v in raw.items()}
-    return Probe.model_validate(clean)
+    return Probe.model_validate(
+        {
+            "speed": _grep(r"^Speed:\s*([\d.]+)", r.stderr, multiline=True),
+            "ttft": _grep(r"TTFT:\s*([\d.]+)", r.stderr),
+            "vhit": _grep(r"VRAM hit rate:\s*([\d.]+)", r.stderr),
+        }
+    )
 
 
-def cmd_standalone(args: argparse.Namespace) -> None:
+def cmd_standalone(args: StandaloneArgs) -> None:
     """Run colibri standalone: fresh process per prompt, heat accumulates over Q1-Q30."""
-    prompts = Path(args.prompts).read_text().strip().splitlines()
-    if len(prompts) < N_PROMPTS:
-        msg = f"need {N_PROMPTS} prompts, got {len(prompts)}"
-        raise SystemExit(msg)
-
-    heat = Path(args.heat)
+    prompts = _load_prompts(args.prompts)
+    heat = args.heat
     if heat.exists():
         heat.unlink()  # Q1 = cold: start without accumulated heat
 
@@ -617,121 +657,74 @@ def cmd_standalone(args: argparse.Namespace) -> None:
     warm_speed: list[float] = []
     warm_vhit: list[float] = []
     sampler = ResourceSampler()
-    sampler_started = False
 
     for i, p in enumerate(prompts):
-        m = _run_once(args.engine, args.snap, args.expert_gb, args.n_new, heat, p, cuda=args.cuda)
-        if i == 0:
+        m = _run_once(args, heat, p)
+        ph = _phase(i)
+        if ph == "cold":
             cold = m
-            print(f"cold: req{i} {_fmt(m.speed)} tok/s TTFT {_fmt(m.ttft)}s VRAMhit {_fmt(m.vhit)}%")
-        elif 1 <= i <= HEAT_LAST:
-            print(f"heat: req{i} {_fmt(m.speed)} tok/s (discarded)")
-        else:
-            if not sampler_started:  # sample resources only during warm (Q21-30)
-                sampler.start()
-                sampler_started = True
+        elif ph == "warm":
+            sampler.start()
             if m.speed is not None:
                 warm_speed.append(m.speed)
             if m.vhit is not None:
                 warm_vhit.append(m.vhit)
-            print(f"warm: req{i} {_fmt(m.speed)} tok/s TTFT {_fmt(m.ttft)}s VRAMhit {_fmt(m.vhit)}%")
+        tail = " (discarded)" if ph == "heat" else f" TTFT {_fmt(m.ttft)}s VRAMhit {_fmt(m.vhit)}%"
+        print(f"{ph}: req{i} {_fmt(m.speed)} tok/s{tail}")
 
     sampler.stop()
     print("---")
     if cold:
         print(f"cold: {_fmt(cold.speed)} tok/s TTFT {_fmt(cold.ttft)}s VRAMhit {_fmt(cold.vhit)}%")
-    _mean_std(warm_speed, "warm tok/s mean")
-    _mean_std(warm_vhit, "warm VRAMhit % mean")
+    for label, vals in (("warm tok/s", warm_speed), ("warm VRAMhit %", warm_vhit)):
+        m, s = _mean_std(vals)
+        sd = f" (stddev {s:.2f})" if m is not None and len(vals) >= STDDEV_MIN else ""
+        print(f"{label} mean: {m:.2f}{sd}" if m is not None else f"{label} mean: n/a")
     print(sampler.report())
-    _push_summary("standalone", args.expert_gb, cold, warm_speed, warm_vhit, sampler)
-    cpu_m, _ = sampler.mean_std(sampler.cpu)
-    gpu_m, _ = sampler.mean_std(sampler.gpu)
-    vram_m, _ = sampler.mean_std(sampler.vram_mb)
-    payload = {
-        "cold_tps": cold.speed if cold else None,
-        "cold_ttft": cold.ttft if cold else None,
-        "cold_vhit": cold.vhit if cold else None,
-        "warm_tps": statistics.mean(warm_speed) if warm_speed else None,
-        "warm_sd": statistics.stdev(warm_speed) if len(warm_speed) >= STDDEV_MIN else None,
-        "warm_vhit": statistics.mean(warm_vhit) if warm_vhit else None,
-        "warm_vhit_sd": statistics.stdev(warm_vhit) if len(warm_vhit) >= STDDEV_MIN else None,
-        "cpu_warm": cpu_m,
-        "gpu_warm": gpu_m,
-        "vram_warm": round(vram_m / 1024, 2) if vram_m else None,
-    }
-    print(f"JSON: {json.dumps(payload)}")
+    _push_summary(args, cold, warm_speed, warm_vhit, sampler)
+    warm_mean, warm_sd = _mean_std(warm_speed)
+    vhit_mean, vhit_sd = _mean_std(warm_vhit)
+    cpu_warm, gpu_warm, vram_warm = sampler.stats()
+    metrics = SeriesMetrics(
+        cold_tps=cold.speed if cold else None,
+        cold_ttft=cold.ttft if cold else None,
+        cold_vhit=cold.vhit if cold else None,
+        warm_tps=warm_mean,
+        warm_sd=warm_sd if len(warm_speed) >= STDDEV_MIN else None,
+        warm_vhit=vhit_mean,
+        warm_vhit_sd=vhit_sd if len(warm_vhit) >= STDDEV_MIN else None,
+        cpu_warm=cpu_warm,
+        gpu_warm=gpu_warm,
+        vram_warm=vram_warm,
+    )
+    print(f"JSON: {metrics.model_dump_json()}")
 
 
 def _push_summary(
-    mode: str,
-    expert_gb: str,
+    args: StandaloneArgs,
     cold: Probe | None,
     warm_speed: list[float],
     warm_vhit: list[float],
     sampler: ResourceSampler,
 ) -> None:
     """Send a compact ntfy summary of the finished measurement."""
-    parts = [f"[{mode} gb={expert_gb}]"]
+    parts = [f"[standalone gb={args.expert_gb}]"]
     if cold and cold.speed is not None:
         parts.append(f"cold {cold.speed:.2f} tok/s")
     if warm_speed:
         parts.append(f"warm {statistics.mean(warm_speed):.2f} tok/s")
     if warm_vhit:
         parts.append(f"hit {statistics.mean(warm_vhit):.1f}%")
-    cpu_m, _ = sampler.mean_std(sampler.cpu)
-    gpu_m, _ = sampler.mean_std(sampler.gpu)
-    if cpu_m is not None:
-        parts.append(f"CPU {cpu_m:.0f}%")
-    if gpu_m is not None:
-        parts.append(f"GPU {gpu_m:.0f}%")
+    for label, values in (("CPU", sampler.cpu), ("GPU", sampler.gpu)):
+        m, _ = _mean_std(values)
+        if m is not None:
+            parts.append(f"{label} {m:.0f}%")
     notify(" | ".join(parts))
 
 
 def main() -> None:
-    """Entry point: dispatch to start, serve, or standalone subcommand."""
-    ap = argparse.ArgumentParser(description="LLM benchmark: serve + standalone")
-    sub = ap.add_subparsers(dest="cmd", required=True)
-
-    sp_start = sub.add_parser("start", help="launch a server in background")
-    sp_start.add_argument("--backend", choices=["colibri", "llama"], required=True)
-    sp_start.add_argument("--port", type=int, default=8888)
-    sp_start.add_argument("--expert-gb", default="5")
-    sp_start.add_argument("--container", choices=["int4", "gs64"], default="int4")
-    sp_start.add_argument("--snap", default=None)
-    sp_start.set_defaults(func=cmd_start)
-
-    sp_serve = sub.add_parser("serve", help="benchmark a running server")
-    sp_serve.add_argument("--url", default="http://127.0.0.1:8888/v1/chat/completions")
-    sp_serve.add_argument("--model", default="qwen3.6-colibri")
-    sp_serve.add_argument("--prompts", default="prompts/math.txt")
-    sp_serve.add_argument("--max-tokens", type=int, default=100)
-    sp_serve.add_argument("--mode", choices=["colibri", "llama"], default="colibri")
-    sp_serve.set_defaults(func=cmd_serve)
-
-    sp_standalone = sub.add_parser("standalone", help="colibri standalone, fresh process per prompt")
-    sp_standalone.add_argument("--prompts", default="prompts/math.txt")
-    sp_standalone.add_argument("--expert-gb", default="5")
-    sp_standalone.add_argument("--engine", default=str(Path.home() / "src/colibri/c/qwen36.real"))
-    sp_standalone.add_argument("--snap", default=str(Path.home() / "models/qwen36-35b-a3b-colibri-i4"))
-    sp_standalone.add_argument("--n-new", default="100")
-    sp_standalone.add_argument("--heat", default="/tmp/q36_standalone.heat")
-    sp_standalone.add_argument("--cuda", action=argparse.BooleanOptionalAction, default=True)
-    sp_standalone.set_defaults(func=cmd_standalone)
-
-    sp_all = sub.add_parser("run-all", help="orchestrate all series (6 domains x backends) -> results/bench.log")
-    sp_all.add_argument("--port", type=int, default=8888)
-    sp_all.add_argument("--domains", default=",".join(DOMAINS))
-    sp_all.add_argument("--backends", default=",".join(BACKENDS))
-    sp_all.add_argument("--runs", default=None, help="JSON list of Run definitions; overrides --domains/--backends")
-    sp_all.set_defaults(func=cmd_run_all)
-
-    sp_analyze = sub.add_parser("analyze", help="parse results/bench.log into a Markdown table")
-    sp_analyze.add_argument("--log", default="results/bench.log")
-    sp_analyze.add_argument("--out", default="results/table.md")
-    sp_analyze.set_defaults(func=cmd_analyze)
-
-    args = ap.parse_args()
-    args.func(args)
+    """Entry point: dispatch to the selected subcommand."""
+    CliApp.run(Bench)
 
 
 if __name__ == "__main__":
